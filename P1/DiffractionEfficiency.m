@@ -1,0 +1,145 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  Diffraction Through a Grating
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Initialize MATLAB
+close all; clc;
+clear all; 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  Problem
+%   A triangular diffraction grating is designed to operate at 10Ghz
+%   Simulate for a wave at normal incidence with EM Field polarized
+%   parallel to grooves.  Period of traingles is Lambda=3.5cm, Traingular
+%   width is f*Lambda where f=80%, depth of traingle is 10.8mm, outside 
+%   of device er=1 device er=9
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% UNITS
+meters = 1;
+decimeters = 1e-1 * meters;
+centimeters = 1e-2 * meters;
+millimeters = 1e-3 * meters;
+inches = 2.54 * centimeters;
+feet = 12 * inches;
+seconds = 1;
+hertz = 1/seconds;
+kilohertz = 1e3 * hertz;
+megahertz = 1e6 * hertz;
+gigahertz = 1e9 * hertz;
+
+% Constants
+c0 = 299792458;
+
+% Frequency we want to transmit
+f0 = 10 * gigahertz;
+
+NPML = [0 0 20 20];
+
+% Grating Material
+er1 = 9;
+
+d = 10.8 * millimeters; % the Binary stand height
+PeriodWidth = 3.5 * centimeters;  %Width between to Binary stands
+trianglewidth = .8 * PeriodWidth;
+flatwidth = .2 * PeriodWidth;
+
+%Calculate the Length of our layers.
+
+
+dc.x = PeriodWidth;
+dc.y = d;
+
+Size.x = PeriodWidth;
+Size.y = d;
+
+rNx = ceil(Size.x/(centimeters*decimeters)); %This Nz represents real world size
+rNy = ceil(Size.y/(centimeters*decimeters));
+disp(rNx);
+disp(rNy);
+
+% Material Vectors Initialized at Air
+rER = zeros(rNx,rNy);
+rUR = ones(rNx,rNy); 
+
+dx = Size.x/rNx;
+dy = Size.y/rNy;
+
+rise = rNy;
+run = trianglewidth/dx/2;
+m = rise/run;
+
+%Build Left half of triangle our Triangle
+for ny=rNy:-1:1
+  nx = round(ny/(-1*m));
+  rER(nx+21,ny)=er1;
+end
+
+% % Build Right half of triangle our Triangle
+for ny=rNy:-1:1
+  nx = round(ny/(m));
+  rER(nx+21,ny)=er1;
+end
+  
+% Fill our Triangle
+x = floor(flatwidth/dx);
+x = x + (trianglewidth/dx)/2;
+
+for ny=1:rNy
+  for nx=2:x
+    if(rER(nx,ny) == 0)
+      rER(nx,ny) = rER(nx-1,ny);
+    end
+  end
+end
+
+for ny=1:rNy
+  for nx=rNx-1:-1:x
+    if(rER(nx,ny) == 0)
+      rER(nx,ny) = rER(nx+1,ny);
+    end
+  end
+end
+
+% Set our zeros to air
+for nx=1:rNx
+  for ny=1:rNy
+    if(rER(nx,ny) == 0)
+      rER(nx,ny) = 1;
+    end
+  end
+end
+    
+x = floor(flatwidth/dx);
+rER(x,rNy) = er1;
+
+x = x + (trianglewidth/dx)/2;
+rER(x,1) = er1;
+x = x + (trianglewidth/dx)/2;
+disp(x);
+rER(x,rNy) = er1;
+
+% Frequency
+
+freq_start = 5 * gigahertz;
+freq_end = 15 * gigahertz;
+
+NFREQ = freq_end / (0.5*gigahertz); %Frequencies every 100nm
+FREQ = linspace(freq_start, freq_end, NFREQ); %FREQ List
+
+Buffer.x.value = 0;
+Buffer.x.e = [-1 -1];
+Buffer.x.u = [1 1];
+
+Buffer.y.value = -1;
+Buffer.y.e = [1 9];
+Buffer.y.u = [1 1];
+
+subplot(121);
+imagesc(rER);
+subplot(122);
+imagesc(rER');
+
+FDTD2D( dc, Size, rER, rUR, 10, 5e-4, Buffer, NPML, FREQ, NFREQ, 1000, 10*gigahertz, 'Diffraction Grating', -1);
+disp('finished');
